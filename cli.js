@@ -41,26 +41,29 @@ module.exports = async () => {
 
   log(chalk.blue('Confirming if this is a LoopBack 4 project.'));
   if (!isLoopBackApp(package)) throw Error('Not a loopback project');
-  
 
   /*******Creating Centeral fuzzy search*******/
   if(centralFuzzy) {
-    const controllerPath = `${invokedFrom}/src/controllers/fuzzy-search.controller.ts`;
-    if (!fs.existsSync(controllerPath)) {
-      log(chalk.blue('Creating fuzzy search controller.'));
-      fs.copyFileSync(path.join(__dirname, './text-codes/fuzzy-search.controller.ts.txt'), controllerPath);
-    }
+    const controllerDirPath = `${invokedFrom}/src/controllers`;
+    if (!fs.existsSync(controllerDirPath)) fs.mkdirSync(controllerDirPath);
+    const controllerPath = `${controllerDirPath}/fuzzy-search.controller.ts`;
+    log(chalk.blue('Creating fuzzy search controller.'));
+    fs.copyFileSync(path.join(__dirname, './text-codes/fuzzy-search.controller.ts.txt'), controllerPath);
     // replacing the datasource provided
     replaceText(controllerPath, 'DbDataSource', datasource,);
     
     // exporting central fuzzy-search endpoint from controllers/index.ts
     const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
-    log(chalk.blue('Updating controllers/index.ts'));
-    updateFile(
-      controllerIndexPath,
-      'export * from \'./ping.controller\';',
-      'export * from \'./fuzzy-search.controller\';'
+    if (!fs.existsSync(controllerIndexPath)) {
+      fs.writeFileSync(controllerIndexPath, 'export * from \'./fuzzy-search.controller\';');
+    } else {
+      updateFile(
+        controllerIndexPath,
+        'export',
+        'export * from \'./fuzzy-search.controller\';',
+        true
       );
+    }
     
     const deps = package.dependencies;
     const pkg = 'fuse.js';
@@ -93,15 +96,22 @@ module.exports = async () => {
       }
     });
     modelNames.forEach(model => {
-      const eachControllerPath = `${invokedFrom}/src/controllers/${model}.controller.ts`;
+      const controller = `${model}.fuzzy`;
+      const eachControllerPath = `${invokedFrom}/src/controllers/${controller}.controller.ts`;
       let camelCasedModel = model;
       if(camelCasedModel.includes('-')) {
         const replacedModel = camelCasedModel.replaceAll('-', ' ');
         camelCasedModel = toCamelCase(replacedModel);
       }
-      const pluralizedModel = pluralize(model);
-      if (fs.existsSync(eachControllerPath)) {
-        const fuzzySearchAPI = `
+      const pluralizedModel = pluralize(controller);
+      log(chalk.blue(`Generating controller file for ${model}`));
+      fs.writeFileSync(eachControllerPath, `import {repository} from '@loopback/repository';`);
+      const fuzzySearchAPIWithClass = `
+        export class ${toPascalCase(controller)}Controller {
+          constructor(
+            @repository(${toPascalCase(camelCasedModel)}Repository)
+            public ${camelCasedModel}Repository: ${toPascalCase(camelCasedModel)}Repository,
+          ) {}
           @get('/${pluralizedModel}/fuzzy/{searchTerm}', {
             responses: {
                 '200': {
@@ -117,67 +127,34 @@ module.exports = async () => {
                 },
               },
             })
-            async fuzzySearch(): Promise<${toPascalCase(pluralizedModel)}[]> {
-              return this.${pluralizedModel}Repository.find();
+            async fuzzySearch(): Promise<${toPascalCase(camelCasedModel)}[]> {
+              return this.${camelCasedModel}Repository.find();
             }
-          `;
-        // updating existing controller file to add fuzzy search endpoint
-        log(chalk.blue(`Adding fuzzy endpoint to ${pluralizedModel}`));
-        updateFile(
-          eachControllerPath,
-          `) {}`,
-          fuzzySearchAPI,
-          );
-      } else {
-        log(chalk.blue(`Generating controller file for ${model}`));
-        fs.writeFileSync(eachControllerPath, `import {repository} from '@loopback/repository';`);
-        const fuzzySearchAPIWithClass = `
-          export class ${toPascalCase(model)}Controller {
-            constructor(
-              @repository(${toPascalCase(camelCasedModel)}Repository)
-              public ${camelCasedModel}Repository: ${toPascalCase(camelCasedModel)}Repository,
-            ) {}
-            @get('/${pluralizedModel}/fuzzy/{searchTerm}', {
-              responses: {
-                  '200': {
-                    description: 'Array of ${pluralizedModel} model instances',
-                    content: {
-                      'application/json': {
-                        schema: {
-                          type: 'array',
-                          items: getModelSchemaRef(${toPascalCase(camelCasedModel)}, {includeRelations: true}),
-                        },
-                      },
-                    },
-                  },
-                },
-              })
-              async fuzzySearch(): Promise<${toPascalCase(camelCasedModel)}[]> {
-                return this.${camelCasedModel}Repository.find();
-              }
-            }
-          `;
-        updateFile(
-          eachControllerPath,
-          `import {repository} from '@loopback/repository';`,
-          fuzzySearchAPIWithClass,
-        );
-        addImports(eachControllerPath, [
-          `import {${toPascalCase(camelCasedModel)}Repository} from '../repositories';`,
-          `import {${toPascalCase(camelCasedModel)}} from '../models';`,
-          `import { get, getModelSchemaRef, } from '@loopback/rest';`,
-          `import {${toPascalCase(camelCasedModel)}Repository} from '../repositories';`,
-          `import {${toPascalCase(camelCasedModel)}} from '../models';`
-        ]);
-
-        const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
-        log(chalk.blue(`Updating controller/index.ts file to add ${model}`));
+          }
+        `;
+      updateFile(
+        eachControllerPath,
+        `import {repository} from '@loopback/repository';`,
+        fuzzySearchAPIWithClass,
+      );
+      addImports(eachControllerPath, [
+        `import {${toPascalCase(camelCasedModel)}Repository} from '../repositories';`,
+        `import {${toPascalCase(camelCasedModel)}} from '../models';`,
+        `import { get, getModelSchemaRef, } from '@loopback/rest';`,
+        `import {${toPascalCase(camelCasedModel)}Repository} from '../repositories';`,
+        `import {${toPascalCase(camelCasedModel)}} from '../models';`
+      ]);
+      const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
+      if (fs.existsSync(controllerIndexPath)) {
+        log(chalk.blue(`Updating controller/index.ts file to add ${controller}`));
         updateFile(
           controllerIndexPath,
-          `export * from './ping.controller';`,
-          `export * from './${model}.controller';`
+          `export`,
+          `export * from './${controller}.controller';`,
+          true
         );
-        
+      } else {
+        fs.writeFileSync(controllerIndexPath, `export * from './${controller}.controller';`);
       }
     });
     await generateServices(invokedFrom);
@@ -186,7 +163,6 @@ module.exports = async () => {
     if (!fs.existsSync(interceptorPath)) {
       log(chalk.blue('Generating fuzzy interceptor.'));
       execute(`lb4 interceptor --config '{"name": "fuzzy", "global":true, "group": "", "yes": true}'`, 'Generating interceptor');
-      
     }
     replaceText(
       interceptorPath,
