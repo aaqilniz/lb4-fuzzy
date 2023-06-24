@@ -1,0 +1,35 @@
+{
+  "name": "lb4-fuzzy",
+  "version": "0.0.1",
+  "description": "a cli tool to add fuzzy searching to a lb4 app",
+  "main": "bin/index.js",
+  "bin": {
+    "lb4-fuzzy": "./bin/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aaqilniz/lb4-fuzzy.git"
+  },
+  "keywords": [
+    "lb4",
+    "cli",
+    "fuzzy",
+    "search",
+    "loopback-next"
+  ],
+  "author": "Muhammad Aaqil",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aaqilniz/lb4-fuzzy/issues"
+  },
+  "homepage": "https://github.com/aaqilniz/lb4-fuzzy#readme",
+  "dependencies": {
+    "chalk": "^4.0.0",
+    "debug": "^4.3.4",
+    "pluralize": "^8.0.0",
+    "yargs": "^17.7.2"
+  }
+}
