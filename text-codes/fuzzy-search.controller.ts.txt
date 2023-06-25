@@ -104,7 +104,7 @@ export class FuzzySearchController {
     // Fetch data from all models
     result = await Promise.all(
       modelRepositories.map(async repo => repo.find()),
-    ).then(results => results.flat());
+    ).then(results => results.reduce((acc, el) => acc.concat(el), []));
     // Get model properties
     const modelProperties: string[] = [];
     result.forEach((item: Model) => {
