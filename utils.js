@@ -1,4 +1,5 @@
 const chalk = require('chalk');
+const prettier = require('prettier');
 const { execSync } = require('child_process');
 const fs = require('fs');
 
@@ -25,6 +26,15 @@ module.exports.isLoopBackApp = (package) => {
   const { dependencies } = package;
   if (!dependencies['@loopback/core']) return false;
   return true;
+}
+
+module.exports.formatCode = (filePath) => {
+  const rawCode = fs.readFileSync(filePath, 'utf8');
+  const formatedCode = prettier.format(rawCode, {
+    parser: 'typescript', 
+    singleQuote: true
+  });
+  fs.writeFileSync(filePath, formatedCode);
 }
 
 module.exports.replaceText = (filePath, updateThis, updateWith, replaceAll) => {
