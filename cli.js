@@ -105,7 +105,7 @@ module.exports = async () => {
       }
     });
     modelNames.forEach(model => {
-      const controller = `${model}.fuzzy`;
+      const controller = `${model}`;
       const eachControllerPath = `${invokedFrom}/src/controllers/${controller}.controller.ts`;
       
       filesChanged.add(eachControllerPath);
@@ -191,7 +191,7 @@ module.exports = async () => {
       const segments = request.path.split('/');
       // Check if the route contains 'fuzzy' and the result is non-empty array
       if (
-        segments.includes('fuzzy') &&
+        segments.indexOf('fuzzy') > 1 &&
         Array.isArray(result) &&
         result.length > 0 &&
         typeof result[0] === 'object'

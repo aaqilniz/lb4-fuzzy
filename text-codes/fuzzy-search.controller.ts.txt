@@ -1,11 +1,11 @@
-                    import {InvocationResult, ValueOrPromise, inject} from '@loopback/core';
+import {InvocationResult, ValueOrPromise, inject} from '@loopback/core';
 import {DataSource, DefaultCrudRepository, Entity, Model, juggler} from '@loopback/repository';
 import {get, getModelSchemaRef, param, requestBody} from '@loopback/rest';
 import * as fs from 'fs';
 import path from 'path';
-                            import {FuzzySearchOptions, FuzzySearchService} from '../services';
+import {FuzzySearchOptions, FuzzySearchService} from '../services';
 
-                export class FuzzySearchController {
+export class FuzzySearchController {
   constructor(
     @inject('datasources.DbDataSource') private dataSource: DataSource,
     @inject('services.FuzzySearchService')
@@ -15,7 +15,7 @@ import path from 'path';
   private async getModelFiles(): Promise<string[]> {
     const modelPath = path.join(__dirname, '..', '/models');
     const modelFiles = fs
-                                                    .readdirSync(modelPath)
+      .readdirSync(modelPath)
       .filter(file => {
         return file.endsWith('.model.ts') || file.endsWith('.model.js');
       })
@@ -44,9 +44,9 @@ import path from 'path';
       },
     );
   }
-                                                                private async getModelInstances(
+  private async getModelInstances(
     modelFiles: string[],
-): Promise<(typeof Entity & {prototype: Entity})[]> {
+  ): Promise<(typeof Entity & {prototype: Entity})[]> {
     const modelClasses: (typeof Entity & {prototype: Entity})[] = [];
     for (const file of modelFiles) {
       const importedModule = await import(file);
@@ -57,7 +57,7 @@ import path from 'path';
     }
     return modelClasses;
   }
-  @get('/central-f/{searchTerm}', {
+  @get('/fuzzy/{searchTerm}', {
     responses: {
       '200': {
         description: 'Fuzzy search results',
