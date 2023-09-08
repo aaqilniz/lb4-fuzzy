@@ -81,7 +81,6 @@ module.exports = async () => {
     servicesGenerated = true;
     log(chalk.bold(chalk.green('Successfully generated central fuzzy search API.')));
   }
-
   /*******Creating fuzzy search for each route*******/
   if(fuzzy) {
     log(chalk.blue('***Generating fuzzy endpoint for each controller***'));
@@ -105,7 +104,7 @@ module.exports = async () => {
       }
     });
     modelNames.forEach(model => {
-      const controller = `${model}`;
+      const controller = `${model}.fuzzy`;
       const eachControllerPath = `${invokedFrom}/src/controllers/${controller}.controller.ts`;
       
       filesChanged.add(eachControllerPath);
@@ -139,7 +138,7 @@ module.exports = async () => {
                 },
               },
             })
-            async fuzzySearch(): Promise<${toPascalCase(camelCasedModel)}[]> {
+            async fuzzySearch(@param.path.string('searchTerm') searchTerm: string): Promise<${toPascalCase(camelCasedModel)}[]> {
               return this.${camelCasedModel}Repository.find();
             }
           }
@@ -152,7 +151,7 @@ module.exports = async () => {
       addImports(eachControllerPath, [
         `import {${toPascalCase(camelCasedModel)}Repository} from '../repositories';`,
         `import {${toPascalCase(camelCasedModel)}} from '../models';`,
-        `import { get, getModelSchemaRef, } from '@loopback/rest';`,
+        `import { get, getModelSchemaRef, param, } from '@loopback/rest';`,
         `import {${toPascalCase(camelCasedModel)}Repository} from '../repositories';`,
         `import {${toPascalCase(camelCasedModel)}} from '../models';`
       ]);
