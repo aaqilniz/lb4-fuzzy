@@ -110,7 +110,7 @@ module.exports = async () => {
       filesChanged.add(eachControllerPath);
 
       if(model.includes('-')) {
-        model = camelCasedModel.replaceAll('-', ' ');
+        model = model.replaceAll('-', ' ');
       }
       let camelCasedModel = toCamelCase(model);
       log(chalk.blue(`Generating controller file for ${modelWithPrefix}`));
@@ -215,7 +215,10 @@ module.exports = async () => {
               modelName: result[0].constructor.name, // Name of the model
             };
           });
-          return searchResult;
+          const sortedResult = searchResult.sort(function(a: any, b: any) {
+            return parseFloat(b.score) - parseFloat(a.score);
+          });
+          return sortedResult;
         }
       }
       `,

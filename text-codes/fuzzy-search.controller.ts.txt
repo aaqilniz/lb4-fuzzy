@@ -117,7 +117,9 @@ const modelInstances = await this.getModelInstances(modelFiles);
         model: result[index].constructor.name, // Name of the model
       };
     });
-
-    return searchResult;
+    const sortedResult = searchResult.sort(function(a: any, b: any) {
+      return parseFloat(b.score) - parseFloat(a.score);
+    });
+    return sortedResult;
   }
 }
