@@ -73,22 +73,6 @@ export class FuzzySearchController {
     },
   })
   async fuzzySearch(
-    @requestBody({
-      content: {
-        'application/json': {
-          schema: {
-            type: 'object',
-            properties: {
-              query: {type: 'string'},
-              options: {type: 'object'},
-            },
-          },
-        },
-      },
-    })
-    requestbody: {
-      options: object;
-    },
     @param.path.string('searchTerm') searchTerm: string,
 ): Promise<object[]> {
     //const {options} = requestbody;

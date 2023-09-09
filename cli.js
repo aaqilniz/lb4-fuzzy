@@ -104,29 +104,27 @@ module.exports = async () => {
       }
     });
     modelNames.forEach(model => {
-      const controller = `${model}.fuzzy`;
-      const eachControllerPath = `${invokedFrom}/src/controllers/${controller}.controller.ts`;
+      const modelWithPrefix = `fuzzy-${model}`
+      const eachControllerPath = `${invokedFrom}/src/controllers/${modelWithPrefix}.controller.ts`;
       
       filesChanged.add(eachControllerPath);
 
-      let camelCasedModel = model;
-      if(camelCasedModel.includes('-')) {
-        const replacedModel = camelCasedModel.replaceAll('-', ' ');
-        camelCasedModel = toCamelCase(replacedModel);
+      if(model.includes('-')) {
+        model = camelCasedModel.replaceAll('-', ' ');
       }
-      const pluralizedModel = pluralize(controller);
-      log(chalk.blue(`Generating controller file for ${model}`));
+      let camelCasedModel = toCamelCase(model);
+      log(chalk.blue(`Generating controller file for ${modelWithPrefix}`));
       fs.writeFileSync(eachControllerPath, `import {repository} from '@loopback/repository';`);
       const fuzzySearchAPIWithClass = `
-        export class ${toPascalCase(controller)}Controller {
+        export class ${toPascalCase(modelWithPrefix)}Controller {
           constructor(
             @repository(${toPascalCase(camelCasedModel)}Repository)
             public ${camelCasedModel}Repository: ${toPascalCase(camelCasedModel)}Repository,
           ) {}
-          @get('/${pluralizedModel}/fuzzy/{searchTerm}', {
+          @get('/${pluralize(model)}/fuzzy/{searchTerm}', {
             responses: {
                 '200': {
-                  description: 'Array of ${pluralizedModel} model instances',
+                  description: 'Array of ${toPascalCase(camelCasedModel)} model instances',
                   content: {
                     'application/json': {
                       schema: {
@@ -156,15 +154,15 @@ module.exports = async () => {
         `import {${toPascalCase(camelCasedModel)}} from '../models';`
       ]);
       if (fs.existsSync(controllerIndexPath)) {
-        log(chalk.blue(`Updating controller/index.ts file to add ${controller}`));
+        log(chalk.blue(`Updating controller/index.ts file to add ${modelWithPrefix}`));
         updateFile(
           controllerIndexPath,
           `export`,
-          `export * from './${controller}.controller';`,
+          `export * from './${modelWithPrefix}.controller';`,
           true
         );
       } else {
-        fs.writeFileSync(controllerIndexPath, `export * from './${controller}.controller';`);
+        fs.writeFileSync(controllerIndexPath, `export * from './${modelWithPrefix}.controller';`);
       }
     });
     if(!servicesGenerated) {
