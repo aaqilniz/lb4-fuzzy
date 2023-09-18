@@ -23,6 +23,7 @@ module.exports = async () => {
     fuzzy,
     centralFuzzy,
     datasource,
+    appName,
     config,
   } = yargs(process.argv.slice(2)).argv;
   let servicesGenerated = false;
@@ -33,10 +34,11 @@ module.exports = async () => {
     centralFuzzy = config.centralFuzzy;
     fuzzy = config.fuzzy;
     datasource = config.datasource;
+    appName = config.appName
   }
 
-  if((!fuzzy && !centralFuzzy) || !datasource) {
-    throw Error('please pass configs: fuzzy or centralFuzzy and datasource');
+  if((!fuzzy && !centralFuzzy) || !datasource || !appName) {
+    throw Error('please pass configs: fuzzy or centralFuzzy, datasource and appName');
   }
 
   const package = require(`${invokedFrom}/package.json`);
@@ -56,6 +58,8 @@ module.exports = async () => {
     fs.copyFileSync(centralControllerTemplatePath, controllerPath);
 
     // replacing the datasource provided
+    replaceText(controllerPath, 'ApplicationClassNameHere', `${appName}Application`, true);
+
     replaceText(controllerPath, 'DbDataSource', datasource,);
 
     // exporting central fuzzy-search endpoint from controllers/index.ts
@@ -73,9 +77,17 @@ module.exports = async () => {
     }
     
     const deps = package.dependencies;
-    const pkg = 'fuse.js';
-    if (!deps[pkg]) {
-      execute(`npm i ${pkg}`, `Installing ${pkg}`, 'installing fues.js');
+    const fusePacakge = 'fuse.js';
+    const pluralizePacakge = 'pluralize';
+    const pluralizeTypePacakge = '@types/pluralize';
+    if (!deps[fusePacakge]) {
+      execute(`npm i ${fusePacakge}`, `Installing ${fusePacakge}`, 'installing fues.js');
+    }
+    if (!deps[pluralizePacakge]) {
+      execute(`npm i ${pluralizePacakge}`, `Installing ${pluralizePacakge}`, 'installing fues.js');
+    }
+    if (!deps[pluralizeTypePacakge]) {
+      execute(`npm i ${pluralizeTypePacakge}`, `Installing ${pluralizeTypePacakge}`, 'installing fues.js');
     }
     await generateServices(invokedFrom);
     servicesGenerated = true;
@@ -304,10 +316,11 @@ const generateServices = async (invokedFrom) => {
       data: T[],
       searchTerm: string,
       options: FuzzySearchOptions,
+      limit: number = 10
     ): Fuse.FuseResult<T>[] {
       const fuseIndex = Fuse.createIndex(options.keys, data);
       const fuse = new Fuse(data, options, fuseIndex);
-      return fuse.search(searchTerm);
+      return fuse.search(searchTerm, {limit});
     }`
     );
   addImports(servicesPath, [`import Fuse from 'fuse.js';`]);

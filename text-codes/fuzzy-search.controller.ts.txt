@@ -1,53 +1,77 @@
-import {InvocationResult, ValueOrPromise, inject} from '@loopback/core';
-import {DataSource, DefaultCrudRepository, Entity, Model, juggler} from '@loopback/repository';
-import {get, getModelSchemaRef, param, requestBody} from '@loopback/rest';
+import { CoreBindings, inject } from '@loopback/core';
+import {
+  DataSource,
+  DefaultCrudRepository,
+  Entity,
+  Model,
+  ModelDefinition,
+  juggler,
+} from '@loopback/repository';
+import { get, getModelSchemaRef, param } from '@loopback/rest';
 import * as fs from 'fs';
 import path from 'path';
-import {FuzzySearchOptions, FuzzySearchService} from '../services';
+import Pluralize from 'pluralize';
+
+import { FuzzySearchOptions, FuzzySearchService } from '../services';
+import { ApplicationClassNameHere } from '..';
 
 export class FuzzySearchController {
   constructor(
     @inject('datasources.DbDataSource') private dataSource: DataSource,
     @inject('services.FuzzySearchService')
     private fuzzySearchService: FuzzySearchService,
-  ) { }
+    @inject(CoreBindings.APPLICATION_INSTANCE)
+    private app: ApplicationClassNameHere
+  ) {}
 
   private async getModelFiles(): Promise<string[]> {
     const modelPath = path.join(__dirname, '..', '/models');
     const modelFiles = fs
       .readdirSync(modelPath)
-      .filter(file => {
+      .filter((file) => {
         return file.endsWith('.model.ts') || file.endsWith('.model.js');
       })
-      .map(file => path.join(modelPath, file));
+      .map((file) => path.join(modelPath, file));
     return modelFiles;
   }
-
-  getModelProperties(modelInstance: Model): string[] {
+  getModelDefinition(modelInstance: Model): ModelDefinition {
     const modelClass = modelInstance.constructor as typeof Entity;
-    const modelDefinition = modelClass.definition;
+    return modelClass.definition;
+  }
+
+  getIdProperty(modelInstance: Model): string {
+    const { properties } = this.getModelDefinition(modelInstance);
+    let idProperty = '';
+    Object.keys(properties).forEach((key: any) => {
+      const property = properties[key];
+      if (property.id) idProperty = key;
+    });
+    return idProperty;
+  }
+  getModelProperties(modelInstance: Model): string[] {
+    const modelDefinition = this.getModelDefinition(modelInstance);
     if (!modelDefinition) {
       return [];
     }
     return Object.keys(modelDefinition.properties);
   }
   private getModelRepositories(
-    modelClasses: (typeof Entity & {prototype: Entity})[],
+    modelClasses: (typeof Entity & { prototype: Entity })[]
   ): Array<DefaultCrudRepository<any, any>> {
     return modelClasses.map(
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      ModelClass => {
+      (ModelClass) => {
         const modelDataSource = new juggler.DataSource(
-          this.dataSource.settings,
+          this.dataSource.settings
         );
         return new DefaultCrudRepository(ModelClass, modelDataSource);
-      },
+      }
     );
   }
   private async getModelInstances(
-    modelFiles: string[],
-  ): Promise<(typeof Entity & {prototype: Entity})[]> {
-    const modelClasses: (typeof Entity & {prototype: Entity})[] = [];
+    modelFiles: string[]
+  ): Promise<(typeof Entity & { prototype: Entity })[]> {
+    const modelClasses: (typeof Entity & { prototype: Entity })[] = [];
     for (const file of modelFiles) {
       const importedModule = await import(file);
       const ModelClass = Object.values(importedModule)[0] as typeof Entity & {
@@ -56,6 +80,22 @@ export class FuzzySearchController {
       modelClasses.push(ModelClass);
     }
     return modelClasses;
+  }
+  private async search(
+    data: any,
+    searchTerm: string,
+    options: any,
+    limit: number
+  ): Promise<any[]> {
+    return new Promise((resolve) => {
+      let searchResult: any = this.fuzzySearchService.search(
+        data,
+        searchTerm,
+        options,
+        limit
+      );
+      resolve(searchResult);
+    });
   }
   @get('/fuzzy/{searchTerm}', {
     responses: {
@@ -74,52 +114,59 @@ export class FuzzySearchController {
   })
   async fuzzySearch(
     @param.path.string('searchTerm') searchTerm: string,
-): Promise<object[]> {
-    //const {options} = requestbody;
-    let result: ValueOrPromise<InvocationResult>; const modelFiles = await this.getModelFiles();
-
+    @param.query.number('limit') limit: number
+  ): Promise<object[]> {
+    const baseURL = this.app.restServer.url;
+    const modelFiles = await this.getModelFiles();
     // // Get model instances
-const modelInstances = await this.getModelInstances(modelFiles);
-
-    // // Get model repositories
+    const modelInstances = await this.getModelInstances(modelFiles);
+    // Get model repositories
     const modelRepositories = this.getModelRepositories(modelInstances);
-
-    // Fetch data from all models
-    result = await Promise.all(
-      modelRepositories.map(async repo => repo.find()),
-    ).then(results => results.reduce((acc, el) => acc.concat(el), []));
-    // Get model properties
-    const modelProperties: string[] = [];
-    result.forEach((item: Model) => {
-      const properties = this.getModelProperties(item);
-      properties.forEach(prop => {
-        modelProperties.push(prop);
-      });
-    });
+    const promises = [];
     const options: FuzzySearchOptions = {
       includeScore: true,
       includeMatches: true,
       minMatchCharLength: 3,
       threshold: 0.4,
       ignoreLocation: true,
-      keys: modelProperties,
+      keys: [],
     };
+    let modelProperties: string[] = [];
 
-    let searchResult = this.fuzzySearchService.search(
-      result,
-      searchTerm,
-      options,
-    );
-    // Add model name and endpoint information to each result
-    searchResult = searchResult.map((item: any, index: any) => {
-      return {
-        ...item,
-        model: result[index].constructor.name, // Name of the model
-      };
+    for (let i = 0; i < modelRepositories.length; i++) {
+      const data = await modelRepositories[i].find();
+      modelProperties = [];
+      data.forEach((item: Model) => {
+        const properties = this.getModelProperties(item);
+        properties.forEach((prop) => {
+          modelProperties.push(prop);
+        });
+      });
+      options.keys = modelProperties;
+      promises.push(this.search(data, searchTerm, options, limit));
+    }
+    const searchedData = await Promise.all(promises);
+    const flatSearchData = searchedData.flat();
+    // adding reference and removing duplicate matches
+    flatSearchData.forEach((result, index) => {
+      const { item, matches } = result;
+      const model = item.constructor.name;
+      let idKey = this.getIdProperty(item);
+      let url = `${baseURL}/${Pluralize(model.toLocaleLowerCase())}/${
+        item[idKey]
+      }`;
+      flatSearchData[index] = { ...result, model, url };
+      const kvArray = matches.map((entry: any) => {
+        const key = ['key', 'value'].map((k: any) => entry[k]).join('|');
+        return [key, entry];
+      });
+      const map = new Map(kvArray);
+      const uniqueMatches = Array.from(map.values());
+      flatSearchData[index].matches = uniqueMatches;
     });
-    const sortedResult = searchResult.sort(function(a: any, b: any) {
+    const sortedResut = flatSearchData.sort(function (a: any, b: any) {
       return parseFloat(b.score) - parseFloat(a.score);
     });
-    return sortedResult;
+    return sortedResut;
   }
 }
