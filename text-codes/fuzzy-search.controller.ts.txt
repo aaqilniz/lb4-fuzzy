@@ -131,18 +131,19 @@ export class FuzzySearchController {
       ignoreLocation: true,
       keys: [],
     };
-    let modelProperties: string[] = [];
+    const modelProperties = new Set();
 
     for (let i = 0; i < modelRepositories.length; i++) {
       const data = await modelRepositories[i].find();
-      modelProperties = [];
       data.forEach((item: Model) => {
         const properties = this.getModelProperties(item);
         properties.forEach((prop) => {
-          modelProperties.push(prop);
+          modelProperties.add(prop);
         });
       });
-      options.keys = modelProperties;
+      modelProperties.forEach(property => {
+        options.keys.push(property as string);
+      });
       promises.push(this.search(data, searchTerm, options, limit));
     }
     const searchedData = await Promise.all(promises);

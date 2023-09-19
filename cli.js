@@ -206,14 +206,21 @@ module.exports = async () => {
         typeof result[0] === 'object'
       ) {
         const modelProperties = this.getModelProperties(result[0]);
+        const keys = new Set();
+
+        modelProperties.forEach(key => { keys.add(key); });
+
         const options: FuzzySearchOptions = {
           includeScore: true,
           includeMatches: true,
           minMatchCharLength: 3,
           threshold: 0.4,
           ignoreLocation: true,
-          keys: modelProperties,
+          keys: [],
         };
+
+        keys.forEach(key => { options.keys.push(key as string); });
+
         const searchTerm = segments[segments.indexOf('fuzzy') + 1];
         if (searchTerm) {
           let searchResult = this.FuzzySearchService.search(
