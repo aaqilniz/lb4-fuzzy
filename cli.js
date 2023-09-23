@@ -198,6 +198,8 @@ module.exports = async () => {
       `return result;`,
       `const request = this.requestContext.request;
       const segments = request.path.split('/');
+      const threshold = request.query.threshold as  unknown as number;
+      const limit = request.query.limit as  unknown as number;
       // Check if the route contains 'fuzzy' and the result is non-empty array
       if (
         segments.indexOf('fuzzy') > 1 &&
@@ -214,8 +216,9 @@ module.exports = async () => {
           includeScore: true,
           includeMatches: true,
           minMatchCharLength: 3,
-          threshold: 0.4,
+          threshold: threshold | 0.5,
           ignoreLocation: true,
+          ignoreFieldNorm: true,
           keys: [],
         };
 
@@ -227,6 +230,7 @@ module.exports = async () => {
             result,
             searchTerm,
             options,
+            limit
           );
           searchResult = searchResult.map((item: any) => {
             return {
@@ -235,7 +239,7 @@ module.exports = async () => {
             };
           });
           const sortedResult = searchResult.sort(function(a: any, b: any) {
-            return parseFloat(b.score) - parseFloat(a.score);
+            return parseFloat(a.score) - parseFloat(b.score);
           });
           return sortedResult;
         }
@@ -310,6 +314,7 @@ const generateServices = async (invokedFrom) => {
       includeScore?: boolean;
       includeMatches?: boolean;
       minMatchCharLength?: number;
+      ignoreFieldNorm: boolean;
       threshold?: number;
       ignoreLocation?: boolean;
       keys: string[];
@@ -325,6 +330,10 @@ const generateServices = async (invokedFrom) => {
       options: FuzzySearchOptions,
       limit: number = 10
     ): Fuse.FuseResult<T>[] {
+      if(typeof limit === 'string') {
+        limit = +limit;
+        if (isNaN(limit)) limit = 10;
+      }
       const fuseIndex = Fuse.createIndex(options.keys, data);
       const fuse = new Fuse(data, options, fuseIndex);
       return fuse.search(searchTerm, {limit});
