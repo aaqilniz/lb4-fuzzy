@@ -328,11 +328,11 @@ const generateServices = async (invokedFrom) => {
       data: T[],
       searchTerm: string,
       options: FuzzySearchOptions,
-      limit: number = 10
+      limit: number = 100
     ): Fuse.FuseResult<T>[] {
       if(typeof limit === 'string') {
         limit = +limit;
-        if (isNaN(limit)) limit = 10;
+        if (isNaN(limit)) limit = 100;
       }
       const fuseIndex = Fuse.createIndex(options.keys, data);
       const fuse = new Fuse(data, options, fuseIndex);
