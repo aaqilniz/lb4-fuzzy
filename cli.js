@@ -329,7 +329,7 @@ const generateServices = async (invokedFrom) => {
       searchTerm: string,
       options: FuzzySearchOptions,
       limit: number = 100
-    ): Fuse.FuseResult<T>[] {
+    ): FuseResult<T>[] {
       if(typeof limit === 'string') {
         limit = +limit;
         if (isNaN(limit)) limit = 100;
@@ -340,4 +340,5 @@ const generateServices = async (invokedFrom) => {
     }`
     );
   addImports(servicesPath, [`import Fuse from 'fuse.js';`]);
+  addImports(servicesPath, [`import {FuseResult} from 'fuse.js';`]);
 }
