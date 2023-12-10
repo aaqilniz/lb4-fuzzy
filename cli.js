@@ -216,7 +216,7 @@ module.exports = async () => {
           includeScore: true,
           includeMatches: true,
           minMatchCharLength: 3,
-          threshold: threshold | 0.5,
+          threshold: threshold || 0.5,
           ignoreLocation: true,
           ignoreFieldNorm: true,
           keys: [],
