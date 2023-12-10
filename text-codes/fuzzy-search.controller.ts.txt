@@ -16,13 +16,16 @@ import { FuzzySearchOptions, FuzzySearchService } from '../services';
 import { ApplicationClassNameHere } from '..';
 
 export class FuzzySearchController {
+  private modelDataSource: juggler.DataSource
   constructor(
     @inject('datasources.DbDataSource') private dataSource: DataSource,
     @inject('services.FuzzySearchService')
     private fuzzySearchService: FuzzySearchService,
     @inject(CoreBindings.APPLICATION_INSTANCE)
     private app: ApplicationClassNameHere
-  ) {}
+  ) {
+    this.modelDataSource = new juggler.DataSource(this.dataSource.settings);
+  }
 
   private async getModelFiles(): Promise<string[]> {
     const modelPath = path.join(__dirname, '..', '/models');
@@ -61,10 +64,7 @@ export class FuzzySearchController {
     return modelClasses.map(
       // eslint-disable-next-line @typescript-eslint/naming-convention
       (ModelClass) => {
-        const modelDataSource = new juggler.DataSource(
-          this.dataSource.settings
-        );
-        return new DefaultCrudRepository(ModelClass, modelDataSource);
+        return new DefaultCrudRepository(ModelClass, this.modelDataSource);
       }
     );
   }
