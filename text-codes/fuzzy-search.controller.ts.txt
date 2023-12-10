@@ -1,42 +1,22 @@
-import { CoreBindings, inject } from '@loopback/core';
 import {
-  DataSource,
-  DefaultCrudRepository,
   Entity,
   Model,
   ModelDefinition,
-  juggler,
 } from '@loopback/repository';
 import { get, getModelSchemaRef, param } from '@loopback/rest';
-import * as fs from 'fs';
-import path from 'path';
 import Pluralize from 'pluralize';
 
 import { FuzzySearchOptions, FuzzySearchService } from '../services';
 import { ApplicationClassNameHere } from '..';
 
 export class FuzzySearchController {
-  private modelDataSource: juggler.DataSource
   constructor(
-    @inject('datasources.DbDataSource') private dataSource: DataSource,
     @inject('services.FuzzySearchService')
     private fuzzySearchService: FuzzySearchService,
     @inject(CoreBindings.APPLICATION_INSTANCE)
     private app: ApplicationClassNameHere
-  ) {
-    this.modelDataSource = new juggler.DataSource(this.dataSource.settings);
-  }
+  ) {}
 
-  private async getModelFiles(): Promise<string[]> {
-    const modelPath = path.join(__dirname, '..', '/models');
-    const modelFiles = fs
-      .readdirSync(modelPath)
-      .filter((file) => {
-        return file.endsWith('.model.ts') || file.endsWith('.model.js');
-      })
-      .map((file) => path.join(modelPath, file));
-    return modelFiles;
-  }
   getModelDefinition(modelInstance: Model): ModelDefinition {
     const modelClass = modelInstance.constructor as typeof Entity;
     return modelClass.definition;
@@ -57,29 +37,6 @@ export class FuzzySearchController {
       return [];
     }
     return Object.keys(modelDefinition.properties);
-  }
-  private getModelRepositories(
-    modelClasses: (typeof Entity & { prototype: Entity })[]
-  ): Array<DefaultCrudRepository<any, any>> {
-    return modelClasses.map(
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      (ModelClass) => {
-        return new DefaultCrudRepository(ModelClass, this.modelDataSource);
-      }
-    );
-  }
-  private async getModelInstances(
-    modelFiles: string[]
-  ): Promise<(typeof Entity & { prototype: Entity })[]> {
-    const modelClasses: (typeof Entity & { prototype: Entity })[] = [];
-    for (const file of modelFiles) {
-      const importedModule = await import(file);
-      const ModelClass = Object.values(importedModule)[0] as typeof Entity & {
-        prototype: Entity;
-      };
-      modelClasses.push(ModelClass);
-    }
-    return modelClasses;
   }
   private search(
     data: any,
@@ -115,11 +72,13 @@ export class FuzzySearchController {
     @param.query.number('threshold') threshold: number
   ): Promise<object[]> {
     const baseURL = this.app.restServer.url;
-    const modelFiles = await this.getModelFiles();
-    // // Get model instances
-    const modelInstances = await this.getModelInstances(modelFiles);
+    const modelRepositories: any[] = [];
+    const repoNames = this.app.findByTag('repository')
     // Get model repositories
-    const modelRepositories = this.getModelRepositories(modelInstances);
+    for (let i = 0; i < repoNames.length; i++) {
+      const repoName = repoNames[i];
+      modelRepositories.push(await this.app.get(repoName.key))
+    }
     const promises: any = [];
     const options: FuzzySearchOptions = {
       includeScore: true,
