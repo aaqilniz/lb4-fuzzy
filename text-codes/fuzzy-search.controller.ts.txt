@@ -1,9 +1,12 @@
+import { CoreBindings, inject } from '@loopback/core';
 import {
   Entity,
   Model,
   ModelDefinition,
 } from '@loopback/repository';
 import { get, getModelSchemaRef, param } from '@loopback/rest';
+import * as fs from 'fs';
+import path from 'path';
 import Pluralize from 'pluralize';
 
 import { FuzzySearchOptions, FuzzySearchService } from '../services';
