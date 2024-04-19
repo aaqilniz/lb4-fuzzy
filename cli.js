@@ -120,7 +120,7 @@ module.exports = async () => {
       const eachControllerPath = `${invokedFrom}/src/controllers/${modelWithPrefix}.controller.ts`;
       
       filesChanged.add(eachControllerPath);
-
+      const uri = model;
       if(model.includes('-')) {
         model = model.replaceAll('-', ' ');
       }
@@ -133,7 +133,7 @@ module.exports = async () => {
             @repository(${toPascalCase(camelCasedModel)}Repository)
             public ${camelCasedModel}Repository: ${toPascalCase(camelCasedModel)}Repository,
           ) {}
-          @get('/${pluralize(model)}/fuzzy/{searchTerm}', {
+          @get('/${pluralize(uri)}/fuzzy/{searchTerm}', {
             responses: {
                 '200': {
                   description: 'Array of ${toPascalCase(camelCasedModel)} model instances',
