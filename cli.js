@@ -222,7 +222,9 @@ module.exports = async () => {
 
         keys.forEach(key => { options.keys.push(key as string); });
 
-        const searchTerm = segments[segments.indexOf('fuzzy') + 1];
+        let searchTerm = segments[segments.indexOf('fuzzy') + 1];
+        searchTerm = searchTerm.split(' ').reduce((previousValue, currentValue) => previousValue + \` '${currentValue}\`, '');
+
         if (searchTerm) {
           let searchResult = this.FuzzySearchService.search(
             result,
