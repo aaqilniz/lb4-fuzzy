@@ -45,7 +45,19 @@ module.exports = async () => {
 
   log(chalk.blue('Confirming if this is a LoopBack 4 project.'));
   if (!isLoopBackApp(package)) throw Error('Not a loopback project');
-
+  const deps = package.dependencies;
+  const fusePacakge = 'fuse.js';
+  const pluralizePacakge = 'pluralize';
+  const pluralizeTypePacakge = '@types/pluralize';
+  if (!deps[fusePacakge]) {
+    execute(`npm i ${fusePacakge}`, `Installing ${fusePacakge}`, 'installing fues.js');
+  }
+  if (!deps[pluralizePacakge]) {
+    execute(`npm i ${pluralizePacakge}`, `Installing ${pluralizePacakge}`, 'installing fues.js');
+  }
+  if (!deps[pluralizeTypePacakge]) {
+    execute(`npm i ${pluralizeTypePacakge}`, `Installing ${pluralizeTypePacakge}`, 'installing fues.js');
+  }
   /*******Creating Centeral fuzzy search*******/
   if(centralFuzzy) {
     const controllerDirPath = `${invokedFrom}/src/controllers`;
@@ -74,20 +86,6 @@ module.exports = async () => {
         'export * from \'./fuzzy-search.controller\';',
         true
       );
-    }
-    
-    const deps = package.dependencies;
-    const fusePacakge = 'fuse.js';
-    const pluralizePacakge = 'pluralize';
-    const pluralizeTypePacakge = '@types/pluralize';
-    if (!deps[fusePacakge]) {
-      execute(`npm i ${fusePacakge}`, `Installing ${fusePacakge}`, 'installing fues.js');
-    }
-    if (!deps[pluralizePacakge]) {
-      execute(`npm i ${pluralizePacakge}`, `Installing ${pluralizePacakge}`, 'installing fues.js');
-    }
-    if (!deps[pluralizeTypePacakge]) {
-      execute(`npm i ${pluralizeTypePacakge}`, `Installing ${pluralizeTypePacakge}`, 'installing fues.js');
     }
     await generateServices(invokedFrom);
     servicesGenerated = true;
