@@ -24,21 +24,39 @@ module.exports = async () => {
     centralFuzzy,
     datasource,
     appName,
+    exclude,
+    include,
     config,
   } = yargs(process.argv.slice(2)).argv;
   let servicesGenerated = false;
   const invokedFrom = process.cwd();
 
-  if(config && typeof config === 'string') {
+  if (config && typeof config === 'string') {
     config = JSON.parse(config);
     centralFuzzy = config.centralFuzzy;
     fuzzy = config.fuzzy;
     datasource = config.datasource;
-    appName = config.appName
+    appName = config.appName;
+    include = config.include;
+    exclude = config.exclude;
   }
 
-  if((!fuzzy && !centralFuzzy) || !datasource || !appName) {
+  let includings = [];
+  let excludings = [];
+
+  if ((!fuzzy && !centralFuzzy) || !datasource || !appName) {
     throw Error('please pass configs: fuzzy or centralFuzzy, datasource and appName');
+  }
+  if (exclude && include) throw Error('We cannot have include and exclude at the same time.');
+
+  if (include) { includings = include.split(','); }
+  if (exclude) { excludings = exclude.split(','); }
+
+  if (includings) {
+    includings = includings.map(including => pluralize.singular(including));
+  }
+  if (excludings) {
+    excludings = excludings.map(excluding => pluralize.singular(excluding));
   }
 
   const package = require(`${invokedFrom}/package.json`);
@@ -59,13 +77,13 @@ module.exports = async () => {
     execute(`npm i ${pluralizeTypePacakge}`, `Installing ${pluralizeTypePacakge}`, 'installing fues.js');
   }
   /*******Creating Centeral fuzzy search*******/
-  if(centralFuzzy) {
+  if (centralFuzzy) {
     const controllerDirPath = `${invokedFrom}/src/controllers`;
     if (!fs.existsSync(controllerDirPath)) fs.mkdirSync(controllerDirPath);
     const controllerPath = `${controllerDirPath}/fuzzy-search.controller.ts`;
     filesChanged.add(controllerPath);
     log(chalk.blue('Creating fuzzy search controller.'));
-    
+
     const centralControllerTemplatePath = path.join(__dirname, './text-codes/fuzzy-search.controller.ts.txt');
     fs.copyFileSync(centralControllerTemplatePath, controllerPath);
 
@@ -92,7 +110,7 @@ module.exports = async () => {
     log(chalk.bold(chalk.green('Successfully generated central fuzzy search API.')));
   }
   /*******Creating fuzzy search for each route*******/
-  if(fuzzy) {
+  if (fuzzy) {
     log(chalk.blue('***Generating fuzzy endpoint for each controller***'));
     // reading models
     const modelDirPath = `${invokedFrom}/src/models`;
@@ -100,12 +118,12 @@ module.exports = async () => {
     const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
     const modelNames = [];
     fileNames.forEach(fileName => {
-      if(fileName !== 'README.md' && fileName !== 'index.ts') {
+      if (fileName !== 'README.md' && fileName !== 'index.ts') {
         const modelName = fileName.split('.model.ts')[0];
         modelNames.push(modelName);
       }
     });
-    if(!modelNames.length) {
+    if (!modelNames.length) {
       throw Error('No model found. Please run the cli after generating models.');
     }
     modelNames.forEach(modelName => {
@@ -113,13 +131,18 @@ module.exports = async () => {
         throw Error(`Repository for ${modelName} model is not found. Please run the cli after generating repositories.`);
       }
     });
+    let modelsToGenerate = [];
     modelNames.forEach(model => {
+      if (includings.length && includings.includes(model)) modelsToGenerate.push(model)
+      if (excludings.length && !excludings.includes(model)) modelsToGenerate.push(model)
+    });
+    modelsToGenerate.forEach(model => {
       const modelWithPrefix = `fuzzy-${model}`
       const eachControllerPath = `${invokedFrom}/src/controllers/${modelWithPrefix}.controller.ts`;
-      
+
       filesChanged.add(eachControllerPath);
       const uri = model;
-      if(model.includes('-')) {
+      if (model.includes('-')) {
         model = model.replaceAll('-', ' ');
       }
       let camelCasedModel = toCamelCase(model);
@@ -175,7 +198,7 @@ module.exports = async () => {
         fs.writeFileSync(controllerIndexPath, `export * from './${modelWithPrefix}.controller';`);
       }
     });
-    if(!servicesGenerated) {
+    if (!servicesGenerated) {
       await generateServices(invokedFrom);
     }
     /*******Creating fuzzy search interceptor under interceptors*******/
@@ -223,7 +246,7 @@ module.exports = async () => {
         keys.forEach(key => { options.keys.push(key as string); });
 
         let searchTerm = segments[segments.indexOf('fuzzy') + 1];
-        searchTerm = searchTerm.split(' ').reduce((previousValue, currentValue) => previousValue + \` '${currentValue}\`, '');
+        searchTerm = searchTerm.split(' ').reduce((previousValue, currentValue) => previousValue + \` '\${currentValue}\`, '');
 
         if (searchTerm) {
           let searchResult = this.FuzzySearchService.search(
@@ -246,7 +269,7 @@ module.exports = async () => {
       }
       `,
       true
-      );
+    );
     // adding BINDING_KEY
     updateFile(
       interceptorPath,
@@ -256,7 +279,7 @@ module.exports = async () => {
       );`,
       true
     );
-    
+
     // add getModelProperties method
     updateFile(
       interceptorPath,
@@ -270,7 +293,7 @@ module.exports = async () => {
         return Object.keys(modelDefinition.properties);
       }`,
       true
-      );
+    );
     // add constructor
     updateFile(
       interceptorPath,
@@ -282,7 +305,7 @@ module.exports = async () => {
         private requestContext: RequestContext,
       ) { }`,
       true
-      );
+    );
     //adding required imports service and BindKey from context
     addImports(interceptorPath, [
       `import {BindingKey} from '@loopback/context';`,
@@ -338,7 +361,7 @@ const generateServices = async (invokedFrom) => {
       const fuse = new Fuse(data, options, fuseIndex);
       return fuse.search(searchTerm, {limit});
     }`
-    );
+  );
   addImports(servicesPath, [`import Fuse from 'fuse.js';`]);
   addImports(servicesPath, [`import {FuseResult} from 'fuse.js';`]);
 }
