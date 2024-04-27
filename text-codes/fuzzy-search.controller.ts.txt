@@ -85,15 +85,17 @@ export class FuzzySearchController {
     const promises: any = [];
     const options: FuzzySearchOptions = {
       includeScore: true,
+      shouldSort: true,
       includeMatches: true,
       ignoreFieldNorm: true,
       minMatchCharLength: 3,
-      threshold: threshold || 0.5,
       ignoreLocation: true,
       keys: [],
     };
-    const modelProperties = new Set();
+    if (threshold) { options.threshold = threshold; }
 
+    const modelProperties = new Set();
+    
 
     modelRepositories.forEach(repo => { promises.push(repo.find()); });
     
@@ -105,10 +107,9 @@ export class FuzzySearchController {
       properties.forEach((prop) => { modelProperties.add(prop); });
     });
     
-    modelProperties.forEach((property) => {
-      options.keys.push(property as string);
-    });
+    modelProperties.forEach((property) => { options.keys.push(property as string); });
     
+    searchTerm = searchTerm.replace('%20', ' ');
     const flatSearchData = this.search(flatData, searchTerm, options, limit);
     
     // adding reference and removing duplicate matches
@@ -128,9 +129,7 @@ export class FuzzySearchController {
       const uniqueMatches = Array.from(map.values());
       flatSearchData[index].matches = uniqueMatches;
     });
-    const sortedResut = flatSearchData.sort(function (a: any, b: any) {
-      return parseFloat(a.score) - parseFloat(b.score);
-    });
-    return sortedResut;
+
+    return flatSearchData;
   }
 }

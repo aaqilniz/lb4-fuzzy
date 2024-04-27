@@ -235,18 +235,18 @@ module.exports = async () => {
 
         const options: FuzzySearchOptions = {
           includeScore: true,
+          shouldSort: true,
           includeMatches: true,
           minMatchCharLength: 3,
-          threshold: threshold || 0.5,
           ignoreLocation: true,
           ignoreFieldNorm: true,
           keys: [],
         };
-
+        if (threshold) { options.threshold = threshold; }
         keys.forEach(key => { options.keys.push(key as string); });
 
         let searchTerm = segments[segments.indexOf('fuzzy') + 1];
-        searchTerm = searchTerm.split(' ').reduce((previousValue, currentValue) => previousValue + \` '\${currentValue}\`, '');
+        searchTerm = searchTerm.replace('%20', ' ');
 
         if (searchTerm) {
           let searchResult = this.FuzzySearchService.search(
@@ -261,10 +261,7 @@ module.exports = async () => {
               modelName: result[0].constructor.name, // Name of the model
             };
           });
-          const sortedResult = searchResult.sort(function(a: any, b: any) {
-            return parseFloat(a.score) - parseFloat(b.score);
-          });
-          return sortedResult;
+          return searchResult;
         }
       }
       `,
@@ -338,6 +335,8 @@ const generateServices = async (invokedFrom) => {
       includeMatches?: boolean;
       minMatchCharLength?: number;
       ignoreFieldNorm: boolean;
+      findAllMatches?: boolean;
+      shouldSort?: boolean;
       threshold?: number;
       ignoreLocation?: boolean;
       keys: string[];
