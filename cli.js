@@ -132,10 +132,14 @@ module.exports = async () => {
       }
     });
     let modelsToGenerate = [];
-    modelNames.forEach(model => {
-      if (includings.length && includings.includes(model)) modelsToGenerate.push(model)
-      if (excludings.length && !excludings.includes(model)) modelsToGenerate.push(model)
-    });
+    if (!includings.length && !excludings.length) {
+      modelsToGenerate = modelNames;
+    } else {
+      modelNames.forEach(model => {
+        if (includings.length && includings.includes(model)) modelsToGenerate.push(model)
+        if (excludings.length && !excludings.includes(model)) modelsToGenerate.push(model)
+      });
+    }
     modelsToGenerate.forEach(model => {
       const modelWithPrefix = `fuzzy-${model}`
       const eachControllerPath = `${invokedFrom}/src/controllers/${modelWithPrefix}.controller.ts`;
@@ -235,18 +239,20 @@ module.exports = async () => {
 
         const options: FuzzySearchOptions = {
           includeScore: true,
-          shouldSort: true,
           includeMatches: true,
           minMatchCharLength: 3,
           ignoreLocation: true,
-          ignoreFieldNorm: true,
+          useExtendedSearch: true,
           keys: [],
         };
+
         if (threshold) { options.threshold = threshold; }
         keys.forEach(key => { options.keys.push(key as string); });
 
         let searchTerm = segments[segments.indexOf('fuzzy') + 1];
         searchTerm = searchTerm.replace('%20', ' ');
+        searchTerm = searchTerm.split(' ').map(word => \`'\${word}\`).join(' ');
+        searchTerm = searchTerm.replace(' ', ' | ');
 
         if (searchTerm) {
           let searchResult = this.FuzzySearchService.search(
@@ -334,11 +340,11 @@ const generateServices = async (invokedFrom) => {
       includeScore?: boolean;
       includeMatches?: boolean;
       minMatchCharLength?: number;
-      ignoreFieldNorm: boolean;
-      findAllMatches?: boolean;
-      shouldSort?: boolean;
+      useExtendedSearch?: boolean,
       threshold?: number;
       ignoreLocation?: boolean;
+      findAllMatches?: boolean;
+      shouldSort?: boolean;
       keys: string[];
     }`,
     true
