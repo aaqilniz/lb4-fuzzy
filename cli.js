@@ -250,9 +250,9 @@ module.exports = async () => {
         keys.forEach(key => { options.keys.push(key as string); });
 
         let searchTerm = segments[segments.indexOf('fuzzy') + 1];
-        searchTerm = searchTerm.replace('%20', ' ');
+        searchTerm = searchTerm.replace(/%20/g, ' ');
         searchTerm = searchTerm.split(' ').map(word => \`'\${word}\`).join(' ');
-        searchTerm = searchTerm.replace(' ', ' | ');
+        searchTerm = searchTerm.replace(/ /g, ' | ');
 
         if (searchTerm) {
           let searchResult = this.FuzzySearchService.search(
