@@ -252,7 +252,7 @@ module.exports = async () => {
         let searchTerm = segments[segments.indexOf('fuzzy') + 1];
         searchTerm = searchTerm.replace(/%20/g, ' ');
         if(searchTerm.split(' ').length > 1) {
-          searchTerm = searchTerm.split(' ').map(word => \`'\${word}\`).join(' ');
+          searchTerm = searchTerm.split(' ').map(word => \`=\${word}\`).join(' ');
           searchTerm = searchTerm.replace(/ /g, ' | ');
         }
 
