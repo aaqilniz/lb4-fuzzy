@@ -52,13 +52,6 @@ module.exports = async () => {
   if (include) { includings = include.split(','); }
   if (exclude) { excludings = exclude.split(','); }
 
-  if (includings) {
-    includings = includings.map(including => pluralize.singular(including));
-  }
-  if (excludings) {
-    excludings = excludings.map(excluding => pluralize.singular(excluding));
-  }
-
   const package = require(`${invokedFrom}/package.json`);
 
   log(chalk.blue('Confirming if this is a LoopBack 4 project.'));
@@ -68,13 +61,13 @@ module.exports = async () => {
   const pluralizePacakge = 'pluralize';
   const pluralizeTypePacakge = '@types/pluralize';
   if (!deps[fusePacakge]) {
-    execute(`npm i ${fusePacakge}`, `Installing ${fusePacakge}`, 'installing fues.js');
+    execute(`npm i ${fusePacakge}`, `Installing ${fusePacakge}`);
   }
   if (!deps[pluralizePacakge]) {
-    execute(`npm i ${pluralizePacakge}`, `Installing ${pluralizePacakge}`, 'installing fues.js');
+    execute(`npm i ${pluralizePacakge}`, `Installing ${pluralizePacakge}`);
   }
   if (!deps[pluralizeTypePacakge]) {
-    execute(`npm i ${pluralizeTypePacakge}`, `Installing ${pluralizeTypePacakge}`, 'installing fues.js');
+    execute(`npm i ${pluralizeTypePacakge}`, `Installing ${pluralizeTypePacakge}`);
   }
   /*******Creating Centeral fuzzy search*******/
   if (centralFuzzy) {
@@ -136,8 +129,8 @@ module.exports = async () => {
       modelsToGenerate = modelNames;
     } else {
       modelNames.forEach(model => {
-        if (includings.length && includings.includes(model)) modelsToGenerate.push(model)
-        if (excludings.length && !excludings.includes(model)) modelsToGenerate.push(model)
+        if (includings.length && includings.includes(model)) modelsToGenerate.push(model);
+        if (excludings.length && !excludings.includes(model)) modelsToGenerate.push(model);
       });
     }
     modelsToGenerate.forEach(model => {
