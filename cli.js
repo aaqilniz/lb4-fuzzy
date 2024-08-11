@@ -144,7 +144,7 @@ module.exports = async () => {
       }
       let camelCasedModel = toCamelCase(model);
       log(chalk.blue(`Generating controller file for ${modelWithPrefix}`));
-      fs.writeFileSync(eachControllerPath, `import {repository} from '@loopback/repository';`);
+      fs.writeFileSync(eachControllerPath, `import {repository,Filter} from '@loopback/repository';`);
       const fuzzySearchAPIWithClass = `
         export class ${toPascalCase(modelWithPrefix)}Controller {
           constructor(
@@ -166,14 +166,18 @@ module.exports = async () => {
                 },
               },
             })
-            async fuzzySearch(@param.path.string('searchTerm') searchTerm: string): Promise<${toPascalCase(camelCasedModel)}[]> {
-              return this.${camelCasedModel}Repository.find();
+            async fuzzySearch(
+              @param.path.string('searchTerm') searchTerm: string,
+              @param.query.object('filter') filter: Filter,
+              ): Promise<${toPascalCase(camelCasedModel)}[]> {
+                if(!filter) filter = {};
+              return this.${camelCasedModel}Repository.find(filter);
             }
           }
         `;
       updateFile(
         eachControllerPath,
-        `import {repository} from '@loopback/repository';`,
+        `import {repository,Filter} from '@loopback/repository';`,
         fuzzySearchAPIWithClass,
       );
       addImports(eachControllerPath, [

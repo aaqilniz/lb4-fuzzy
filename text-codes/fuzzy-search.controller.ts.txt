@@ -3,6 +3,7 @@ import {
   Entity,
   Model,
   ModelDefinition,
+  Filter
 } from '@loopback/repository';
 import { get, getModelSchemaRef, param } from '@loopback/rest';
 import * as fs from 'fs';
@@ -72,7 +73,8 @@ export class FuzzySearchController {
   async fuzzySearch(
     @param.path.string('searchTerm') searchTerm: string,
     @param.query.number('limit') limit: number,
-    @param.query.number('threshold') threshold: number
+    @param.query.number('threshold') threshold: number,
+    @param.query.object('filter') filter: Filter
   ): Promise<object[]> {
     const baseURL = this.app.restServer.url;
     const modelRepositories: any[] = [];
@@ -95,8 +97,8 @@ export class FuzzySearchController {
 
     const modelProperties = new Set();
     
-
-    modelRepositories.forEach(repo => { promises.push(repo.find()); });
+    if(!filter) filter = {};
+    modelRepositories.forEach(repo => { promises.push(repo.find(filter)); });
     
     const data = await Promise.all(promises);
     const flatData = data.flat();
