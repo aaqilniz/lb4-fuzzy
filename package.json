@@ -1,6 +1,6 @@
 {
   "name": "lb4-fuzzy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "a cli tool to add fuzzy searching to a lb4 app",
   "main": "bin/index.js",
   "bin": {
