@@ -8,7 +8,7 @@ import {
 import { get, getModelSchemaRef, param } from '@loopback/rest';
 import * as fs from 'fs';
 import path from 'path';
-import Pluralize from 'pluralize';
+import Pluralize, {singular} from 'pluralize';
 
 import { FuzzySearchOptions, FuzzySearchService } from '../services';
 import { ApplicationClassNameHere } from '..';
@@ -74,15 +74,45 @@ export class FuzzySearchController {
     @param.path.string('searchTerm') searchTerm: string,
     @param.query.number('limit') limit: number,
     @param.query.number('threshold') threshold: number,
-    @param.query.object('filter') filter: Filter
+    @param.query.object('filter') filter: Filter,
+    @param.query.object('excludeModels') exclude: { models: string[] },
+    @param.query.object('includeModels') include: { models: string[] },
   ): Promise<object[]> {
     const baseURL = this.app.restServer.url;
     const modelRepositories: any[] = [];
-    const repoNames = this.app.findByTag('repository')
+    const repoNames = this.app.findByTag('repository');
+
     // Get model repositories
+    
+    if (!exclude) exclude = { models: [] }
+    if (!include) include = { models: [] }
+
     for (let i = 0; i < repoNames.length; i++) {
       const repoName = repoNames[i];
-      modelRepositories.push(await this.app.get(repoName.key))
+      let excludeMatched = false;
+      for (let j = 0; j < exclude.models.length; j++) {
+        let excludeModel = exclude.models[j];
+        excludeModel = excludeModel.toLowerCase();
+        excludeModel = singular(excludeModel);
+        if (repoName.key.toLowerCase().includes(excludeModel)) {
+          excludeMatched = true;
+        }
+      }
+      let includeMatched = false;
+      for (let j = 0; j < include.models.length; j++) {
+        let includeModel = include.models[j];
+        includeModel = includeModel.toLowerCase();
+        includeModel = singular(includeModel);
+        if (repoName.key.toLowerCase().includes(includeModel)) {
+          includeMatched = true;
+        }
+      }
+      if (exclude.models.length && !excludeMatched) {
+        modelRepositories.push(await this.app.get(repoName.key));
+      }
+      if (include.models.length && includeMatched) {
+        modelRepositories.push(await this.app.get(repoName.key));
+      }
     }
     const promises: any = [];
     const options: FuzzySearchOptions = {
