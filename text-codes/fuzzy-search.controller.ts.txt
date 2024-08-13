@@ -89,6 +89,12 @@ export class FuzzySearchController {
 
     for (let i = 0; i < repoNames.length; i++) {
       const repoName = repoNames[i];
+      if (
+        !exclude.models.length &&
+        !include.models.length
+      ) {
+        modelRepositories.push(await this.app.get(repoName.key));
+      }
       let excludeMatched = false;
       for (let j = 0; j < exclude.models.length; j++) {
         let excludeModel = exclude.models[j];
