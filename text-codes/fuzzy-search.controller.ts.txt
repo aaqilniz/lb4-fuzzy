@@ -6,8 +6,6 @@ import {
   Filter
 } from '@loopback/repository';
 import { get, getModelSchemaRef, param } from '@loopback/rest';
-import * as fs from 'fs';
-import path from 'path';
 import Pluralize, {singular} from 'pluralize';
 
 import { FuzzySearchOptions, FuzzySearchService } from '../services';
@@ -79,22 +77,53 @@ export class FuzzySearchController {
     @param.query.object('includeModels') include: { models: string[] },
   ): Promise<object[]> {
     const baseURL = this.app.restServer.url;
-    const modelRepositories: any[] = [];
-    const repoNames = this.app.findByTag('repository');
+    const fetchRepoPromises: any[] = [];
+    const modelNames = this.app.findByTag('model');
+    const modelPromises: Promise<ModelDefinition>[] = [];
 
-    // Get model repositories
-    
     if (!exclude) exclude = { models: [] }
     if (!include) include = { models: [] }
+    
+    for (let index = 0; index < modelNames.length; index++) {
+      const modelName = modelNames[index];
+      modelPromises.push(this.app.get(modelName.key));
+    }
 
-    for (let i = 0; i < repoNames.length; i++) {
-      const repoName = repoNames[i];
+    const models: ModelDefinition[] = await Promise.all(modelPromises);
+
+    const matchedModels: string[] = [];
+    for (let index = 0; index < models.length; index++) {
+      const model: ModelDefinition = models[index];
+      const modelPropertiesToValidate: string[] = [];
+      const { properties, name } = model.definition;
+      Object.keys(properties).forEach(modelProperty => {
+        modelPropertiesToValidate.push(modelProperty);
+      });
+      if (!filter || !filter.where) {
+        matchedModels.push(name);
+        continue;
+      }
+      Object.keys(filter.where).forEach(whereProperty => {
+        if (modelPropertiesToValidate.includes(whereProperty)) {
+          matchedModels.push(name);
+        }
+      });
+    }
+    matchedModels.forEach(matchedModel => {
+      let repoName = `repositories.${matchedModel}Repository`;
+      if (
+        !exclude.models.length &&
+        !include.models.length
+      ) {
+        fetchRepoPromises.push(this.app.get(repoName));
+      }
       let excludeMatched = false;
       for (let j = 0; j < exclude.models.length; j++) {
         let excludeModel = exclude.models[j];
         excludeModel = excludeModel.toLowerCase();
         excludeModel = singular(excludeModel);
-        if (repoName.key.toLowerCase().includes(excludeModel)) {
+
+        if (matchedModel.toLocaleLowerCase() === excludeModel) {
           excludeMatched = true;
         }
       }
@@ -103,17 +132,20 @@ export class FuzzySearchController {
         let includeModel = include.models[j];
         includeModel = includeModel.toLowerCase();
         includeModel = singular(includeModel);
-        if (repoName.key.toLowerCase().includes(includeModel)) {
+        if (matchedModel.toLocaleLowerCase() === includeModel) {
           includeMatched = true;
         }
       }
+
       if (exclude.models.length && !excludeMatched) {
-        modelRepositories.push(await this.app.get(repoName.key));
+        fetchRepoPromises.push(this.app.get(repoName));
       }
       if (include.models.length && includeMatched) {
-        modelRepositories.push(await this.app.get(repoName.key));
+        fetchRepoPromises.push(this.app.get(repoName));
       }
-    }
+    });
+    const repositories = await Promise.all(fetchRepoPromises);
+
     const promises: any = [];
     const options: FuzzySearchOptions = {
       includeScore: true,
@@ -125,36 +157,34 @@ export class FuzzySearchController {
     };
     if (threshold) { options.threshold = threshold; }
 
-    const modelProperties = new Set();
-    
-    if(!filter) filter = {};
-    modelRepositories.forEach(repo => { promises.push(repo.find(filter)); });
-    
+    const modelProperties = new Set<string>();
+
+    if (!filter) filter = {};
+    repositories.forEach(repo => { promises.push(repo.find(filter)) });
+
     const data = await Promise.all(promises);
     const flatData = data.flat();
-    
     flatData.forEach((item: Model) => {
       const properties = this.getModelProperties(item);
       properties.forEach((prop) => { modelProperties.add(prop); });
     });
-    
-    modelProperties.forEach((property) => { options.keys.push(property as string); });
-    
+
+    options.keys = [...modelProperties];
+
     searchTerm = searchTerm.replace(/%20/g, ' ');
-    if(searchTerm.split(' ').length > 1) {
+    if (searchTerm.split(' ').length > 1) {
       searchTerm = searchTerm.split(' ').map(word => `=${word}`).join(' ');
       searchTerm = searchTerm.replace(/ /g, ' | ');
     }
     const flatSearchData = this.search(flatData, searchTerm, options, limit);
-    
+
     // adding reference and removing duplicate matches
     flatSearchData.forEach((result, index) => {
       const { item, matches } = result;
       const model = item.constructor.name;
-      let idKey = this.getIdProperty(item);
-      let url = `${baseURL}/${Pluralize(model.toLocaleLowerCase())}/${
-        item[idKey]
-      }`;
+      const idKey = this.getIdProperty(item);
+      const url = `${baseURL}/${Pluralize(model.toLocaleLowerCase())}/${item[idKey]}`;
+
       flatSearchData[index] = { ...result, model, url };
       const kvArray = matches.map((entry: any) => {
         const key = ['key', 'value'].map((k: any) => entry[k]).join('|');
