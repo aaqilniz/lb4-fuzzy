@@ -7,6 +7,7 @@ const pluralize = require('pluralize');
 const {
   isLoopBackApp,
   updateFile,
+  shouldUpdate,
   addImports,
   execute,
   replaceText,
@@ -80,10 +81,7 @@ module.exports = async () => {
     const centralControllerTemplatePath = path.join(__dirname, './text-codes/fuzzy-search.controller.ts.txt');
     fs.copyFileSync(centralControllerTemplatePath, controllerPath);
 
-    // replacing the datasource provided
     replaceText(controllerPath, 'ApplicationClassNameHere', `${appName}Application`, true);
-
-    replaceText(controllerPath, 'DbDataSource', datasource,);
 
     // exporting central fuzzy-search endpoint from controllers/index.ts
     const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
@@ -109,11 +107,22 @@ module.exports = async () => {
     const modelDirPath = `${invokedFrom}/src/models`;
     const fileNames = fs.readdirSync(modelDirPath);
     const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
+    const repoDirPath = `${invokedFrom}/src/repositories`;
+    const repoFileNames = fs.readdirSync(repoDirPath);
+
     const modelNames = [];
     fileNames.forEach(fileName => {
       if (fileName !== 'README.md' && fileName !== 'index.ts') {
         const modelName = fileName.split('.model.ts')[0];
-        modelNames.push(modelName);
+        repoFileNames.forEach(fileName => {
+          if (fileName !== 'README.md' && fileName !== 'index.ts') {
+            const modelName = fileName.split('.repository.ts')[0];
+            const repoContent = fs.readFileSync(`${repoDirPath}/${fileName}`, 'utf8');
+            if (repoContent.includes(datasource)) {
+              modelNames.push(modelName);
+            }
+          }
+        });
       }
     });
     if (!modelNames.length) {
@@ -348,24 +357,30 @@ const generateServices = async (invokedFrom) => {
     }`,
     true
   );
-  updateFile(
-    servicesPath,
-    `constructor(/* Add @inject to inject parameters */) {}`,
-    `search<T>(
-      data: T[],
-      searchTerm: string,
-      options: FuzzySearchOptions,
-      limit: number = 100
-    ): FuseResult<T>[] {
-      if(typeof limit === 'string') {
-        limit = +limit;
-        if (isNaN(limit)) limit = 100;
-      }
-      const fuseIndex = Fuse.createIndex(options.keys, data);
-      const fuse = new Fuse(data, options, fuseIndex);
-      return fuse.search(searchTerm, {limit});
-    }`
-  );
-  addImports(servicesPath, [`import Fuse from 'fuse.js';`]);
-  addImports(servicesPath, [`import {FuseResult} from 'fuse.js';`]);
+  if (shouldUpdate(servicesPath, 'search<T>(')) {
+    updateFile(
+      servicesPath,
+      `constructor(/* Add @inject to inject parameters */) {}`,
+      `search<T>(
+        data: T[],
+        searchTerm: string,
+        options: FuzzySearchOptions,
+        limit: number = 100
+        ): FuseResult<T>[] {
+          if(typeof limit === 'string') {
+            limit = +limit;
+            if (isNaN(limit)) limit = 100;
+          }
+          const fuseIndex = Fuse.createIndex(options.keys, data);
+          const fuse = new Fuse(data, options, fuseIndex);
+          return fuse.search(searchTerm, {limit});
+        }`
+    );
+  }
+  if (shouldUpdate(servicesPath, `import Fuse from 'fuse.js';`)) {
+    addImports(servicesPath, [`import Fuse from 'fuse.js';`]);
+  }
+  if (shouldUpdate(servicesPath, `import { FuseResult } from 'fuse.js';`)) {
+    addImports(servicesPath, [`import { FuseResult } from 'fuse.js';`]);
+  }
 }

@@ -56,6 +56,11 @@ module.exports.updateFile = (filePath, updateThis, updateWith, pre, replaceAll) 
   }
 }
 
+module.exports.shouldUpdate = (filePath, updates) => {
+  const file = fs.readFileSync(filePath, 'utf8');
+  return !file.includes(updates);
+}
+
 module.exports.addImports = (filePath, newImports) => {
   newImports.forEach(newImport => {
     this.updateFile(filePath, 'import', newImport, true);
