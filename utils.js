@@ -16,8 +16,8 @@ module.exports.toPascalCase = string => string
   .join('');
 
 module.exports.toCamelCase = (string) => string
-  .replace(/(?:^\w|[A-Z]|\b\w|\s+)/g, function(match, index) {
-    if (+match === 0) return ''; 
+  .replace(/(?:^\w|[A-Z]|\b\w|\s+)/g, function (match, index) {
+    if (+match === 0) return '';
     return index === 0 ? match.toLowerCase() : match.toUpperCase();
   });
 
@@ -31,7 +31,7 @@ module.exports.isLoopBackApp = (package) => {
 module.exports.formatCode = (filePath) => {
   const rawCode = fs.readFileSync(filePath, 'utf8');
   const formatedCode = prettier.format(rawCode, {
-    parser: 'typescript', 
+    parser: 'typescript',
     singleQuote: true
   });
   fs.writeFileSync(filePath, formatedCode);
@@ -70,7 +70,7 @@ module.exports.addImports = (filePath, newImports) => {
 module.exports.execute = (command, message) => {
   this.log(chalk.blue(message));
   try {
-    execSync(command, {stdio: 'inherit'});
+    execSync(command, { stdio: 'inherit' });
   } catch (err) {
     throw Error(`failed to execute ${command}`);
   }

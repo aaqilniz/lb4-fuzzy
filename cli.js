@@ -109,23 +109,22 @@ module.exports = async () => {
     const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
     const repoDirPath = `${invokedFrom}/src/repositories`;
     const repoFileNames = fs.readdirSync(repoDirPath);
-
-    const modelNames = [];
+    const modelNames = new Set();
     fileNames.forEach(fileName => {
       if (fileName !== 'README.md' && fileName !== 'index.ts') {
         const modelName = fileName.split('.model.ts')[0];
-        repoFileNames.forEach(fileName => {
-          if (fileName !== 'README.md' && fileName !== 'index.ts') {
-            const modelName = fileName.split('.repository.ts')[0];
-            const repoContent = fs.readFileSync(`${repoDirPath}/${fileName}`, 'utf8');
-            if (repoContent.includes(datasource)) {
-              modelNames.push(modelName);
-            }
-          }
-        });
+        const repoPath = `${repoDirPath}/${modelName}.repository.ts`;
+        const repoExists = fs.existsSync(repoPath);
+        if (!repoExists) {
+          throw Error(`Repository for the ${modelName} model is not found. Please run the cli after generating repositories.`);
+        }
+        const repoContent = fs.readFileSync(repoPath, 'utf8');
+        if (repoContent.includes(`datasources.${datasource}`)) {
+          modelNames.add(modelName);
+        }
       }
     });
-    if (!modelNames.length) {
+    if (!modelNames.size) {
       throw Error('No model found. Please run the cli after generating models.');
     }
     modelNames.forEach(modelName => {
@@ -160,7 +159,7 @@ module.exports = async () => {
             @repository(${toPascalCase(camelCasedModel)}Repository)
             public ${camelCasedModel}Repository: ${toPascalCase(camelCasedModel)}Repository,
           ) {}
-          @get('/${pluralize(uri)}/fuzzy/{searchTerm}', {
+          @get('/${pluralize(datasource.toLowerCase())}/${pluralize(uri)}/fuzzy/{searchTerm}', {
             responses: {
                 '200': {
                   description: 'Array of ${toPascalCase(camelCasedModel)} model instances',
@@ -218,112 +217,125 @@ module.exports = async () => {
       log(chalk.blue('Generating fuzzy interceptor.'));
       execute(`lb4 interceptor --config '{"name": "fuzzy", "global":true, "group": "", "yes": true}'`, 'Generating interceptor');
     }
-    replaceText(
-      interceptorPath,
-      `Interceptor`,
-      `Interceptor, inject`
-    )
+    const interceptorFileContent = fs.readFileSync(interceptorPath);
+    if (interceptorFileContent.includes('/* inject, */')) {
+      replaceText(
+        interceptorPath,
+        `/* inject, */`,
+        `inject ,`
+      );
+    }
     // adding code to intercept
-    updateFile(
-      interceptorPath,
-      `return result;`,
-      `const request = this.requestContext.request;
-      const segments = request.path.split('/');
-      const threshold = request.query.threshold as  unknown as number;
-      const limit = request.query.limit as  unknown as number;
-      // Check if the route contains 'fuzzy' and the result is non-empty array
-      if (
-        segments.indexOf('fuzzy') > 1 &&
-        Array.isArray(result) &&
-        result.length > 0 &&
-        typeof result[0] === 'object'
-      ) {
-        const modelProperties = this.getModelProperties(result[0]);
-        const keys = new Set();
+    if (!interceptorFileContent.includes('const request = this.requestContext.request;')) {
+      updateFile(
+        interceptorPath,
+        `return result;`,
+        `const request = this.requestContext.request;
+        const segments = request.path.split('/');
+        const threshold = request.query.threshold as  unknown as number;
+        const limit = request.query.limit as  unknown as number;
+        // Check if the route contains 'fuzzy' and the result is non-empty array
+        if (
+          segments.indexOf('fuzzy') > 1 &&
+          Array.isArray(result) &&
+          result.length > 0 &&
+          typeof result[0] === 'object'
+        ) {
+          const modelProperties = this.getModelProperties(result[0]);
+          const keys = new Set();
 
-        modelProperties.forEach(key => { keys.add(key); });
+          modelProperties.forEach(key => { keys.add(key); });
 
-        const options: FuzzySearchOptions = {
-          includeScore: true,
-          includeMatches: true,
-          minMatchCharLength: 3,
-          ignoreLocation: true,
-          useExtendedSearch: true,
-          keys: [],
-        };
+          const options: FuzzySearchOptions = {
+            includeScore: true,
+            includeMatches: true,
+            minMatchCharLength: 3,
+            ignoreLocation: true,
+            useExtendedSearch: true,
+            keys: [],
+          };
 
-        if (threshold) { options.threshold = threshold; }
-        keys.forEach(key => { options.keys.push(key as string); });
+          if (threshold) { options.threshold = threshold; }
+          keys.forEach(key => { options.keys.push(key as string); });
 
-        let searchTerm = segments[segments.indexOf('fuzzy') + 1];
-        searchTerm = searchTerm.replace(/%20/g, ' ');
-        if(searchTerm.split(' ').length > 1) {
-          searchTerm = searchTerm.split(' ').map(word => \`=\${word}\`).join(' ');
-          searchTerm = searchTerm.replace(/ /g, ' | ');
+          let searchTerm = segments[segments.indexOf('fuzzy') + 1];
+          searchTerm = searchTerm.replace(/%20/g, ' ');
+          if(searchTerm.split(' ').length > 1) {
+            searchTerm = searchTerm.split(' ').map(word => \`=\${word}\`).join(' ');
+            searchTerm = searchTerm.replace(/ /g, ' | ');
+          }
+
+          if (searchTerm) {
+            let searchResult = this.FuzzySearchService.search(
+              result,
+              searchTerm,
+              options,
+              limit
+            );
+            searchResult = searchResult.map((item: any) => {
+              return {
+                ...item,
+                modelName: result[0].constructor.name, // Name of the model
+              };
+            });
+            return searchResult;
+          }
         }
-
-        if (searchTerm) {
-          let searchResult = this.FuzzySearchService.search(
-            result,
-            searchTerm,
-            options,
-            limit
-          );
-          searchResult = searchResult.map((item: any) => {
-            return {
-              ...item,
-              modelName: result[0].constructor.name, // Name of the model
-            };
-          });
-          return searchResult;
-        }
-      }
-      `,
-      true
-    );
+        `,
+        true
+      );
+    }
     // adding BINDING_KEY
-    updateFile(
-      interceptorPath,
-      `value() {`,
-      `static readonly BINDING_KEY = BindingKey.create<FuzzyInterceptor>(
-        'interceptors.FuzzyInterceptor',
-      );`,
-      true
-    );
+    if (!interceptorFileContent.includes('static readonly BINDING_KEY = BindingKey.create<FuzzyInterceptor>(')) {
+      updateFile(
+        interceptorPath,
+        `value() {`,
+        `static readonly BINDING_KEY = BindingKey.create<FuzzyInterceptor>(
+          'interceptors.FuzzyInterceptor',
+          );`,
+        true
+      );
+    }
 
     // add getModelProperties method
-    updateFile(
-      interceptorPath,
-      `async intercept(`,
-      `getModelProperties(modelInstance: Model): string[] {
-        const modelClass = modelInstance.constructor as typeof Entity;
-        const modelDefinition = modelClass.definition;
-        if (!modelDefinition) {
-          return [];
-        }
-        return Object.keys(modelDefinition.properties);
-      }`,
-      true
-    );
+    if (!interceptorFileContent.includes('getModelProperties')) {
+      updateFile(
+        interceptorPath,
+        `async intercept(`,
+        `getModelProperties(modelInstance: Model): string[] {
+          const modelClass = modelInstance.constructor as typeof Entity;
+          const modelDefinition = modelClass.definition;
+          if (!modelDefinition) {
+            return [];
+            }
+            return Object.keys(modelDefinition.properties);
+            }`,
+        true
+      );
+    }
     // add constructor
-    updateFile(
-      interceptorPath,
-      `value() {`,
-      `constructor(
-        @inject('services.FuzzySearchService')
-        private FuzzySearchService: FuzzySearchService,
-        @inject(RestBindings.Http.CONTEXT)
-        private requestContext: RequestContext,
-      ) { }`,
-      true
-    );
+    if (!interceptorFileContent.includes('private FuzzySearchService: FuzzySearchService,')) {
+      updateFile(
+        interceptorPath,
+        `value() {`,
+        `constructor(
+          @inject('services.FuzzySearchService')
+          private FuzzySearchService: FuzzySearchService,
+          @inject(RestBindings.Http.CONTEXT)
+          private requestContext: RequestContext,
+          ) { }`,
+        true
+      );
+    }
     //adding required imports service and BindKey from context
-    addImports(interceptorPath, [
-      `import {BindingKey} from '@loopback/context';`,
-      `import {FuzzySearchOptions, FuzzySearchService} from '../services';`,
-      `import {Entity} from '@loopback/repository';`,
-      `import {Model, RequestContext, RestBindings} from '@loopback/rest';`
-    ]);
+    if (!interceptorFileContent.includes('FuzzySearchOptions,')) {
+      addImports(interceptorPath, [
+        `import {BindingKey} from '@loopback/context';`,
+        `import {FuzzySearchOptions, FuzzySearchService} from '../services';`,
+        `import {Entity} from '@loopback/repository';`,
+        `import {Model, RequestContext, RestBindings} from '@loopback/rest';`
+      ]);
+    }
     log(chalk.bold(chalk.green('Successfully generated fuzzy search APIs for every controller.')));
   }
 
