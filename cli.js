@@ -27,6 +27,7 @@ module.exports = async () => {
     appName,
     exclude,
     include,
+    subPath,
     config,
   } = yargs(process.argv.slice(2)).argv;
   let servicesGenerated = false;
@@ -40,8 +41,11 @@ module.exports = async () => {
     appName = config.appName;
     include = config.include;
     exclude = config.exclude;
+    subPath = config.subPath;
   }
-
+  if (subPath === undefined) subPath = 'auto';
+  let prefix = subPath === 'auto' ? pluralize(datasource.toLowerCase()) : subPath;
+  if (prefix) prefix = `/${prefix}`;
   let includings = [];
   let excludings = [];
 
@@ -159,7 +163,7 @@ module.exports = async () => {
             @repository(${toPascalCase(camelCasedModel)}Repository)
             public ${camelCasedModel}Repository: ${toPascalCase(camelCasedModel)}Repository,
           ) {}
-          @get('/${pluralize(datasource.toLowerCase())}/${pluralize(uri)}/fuzzy/{searchTerm}', {
+          @get('${prefix}/${pluralize(uri)}/fuzzy/{searchTerm}', {
             responses: {
                 '200': {
                   description: 'Array of ${toPascalCase(camelCasedModel)} model instances',
