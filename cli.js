@@ -237,6 +237,10 @@ module.exports = async () => {
         `const request = this.requestContext.request;
         const segments = request.path.split('/');
         const threshold = request.query.threshold as  unknown as number;
+        let customWeights: { key: number }[] = [];
+        if (request.query.customWeights) {
+          customWeights = JSON.parse(request.query.customWeights as string) as { key: number }[];
+        }
         const limit = request.query.limit as  unknown as number;
         // Check if the route contains 'fuzzy' and the result is non-empty array
         if (
@@ -252,22 +256,27 @@ module.exports = async () => {
 
           const options: FuzzySearchOptions = {
             includeScore: true,
-            includeMatches: true,
-            minMatchCharLength: 3,
+            shouldSort: true,
+            findAllMatches: true,
+            minMatchCharLength: 2,
+            threshold: 0.6,
             ignoreLocation: true,
-            useExtendedSearch: true,
+            includeMatches: true,
             keys: [],
           };
 
           if (threshold) { options.threshold = threshold; }
-          keys.forEach(key => { options.keys.push(key as string); });
+          keys.forEach((key: any) => {
+            let weight = 0.1;
+            let customWeightKeys = Object.keys(customWeights);
+            if (customWeightKeys.includes(key as string)) {
+              weight = customWeights[key] as unknown as number;
+            }
+            options.keys.push({ name: key as string, weight });
+          });
 
           let searchTerm = segments[segments.indexOf('fuzzy') + 1];
-          searchTerm = searchTerm.replace(/%20/g, ' ');
-          if(searchTerm.split(' ').length > 1) {
-            searchTerm = searchTerm.split(' ').map(word => \`=\${word}\`).join(' ');
-            searchTerm = searchTerm.replace(/ /g, ' | ');
-          }
+          searchTerm = decodeURIComponent(searchTerm);
 
           if (searchTerm) {
             let searchResult = this.FuzzySearchService.search(
@@ -369,7 +378,7 @@ const generateServices = async (invokedFrom) => {
       ignoreLocation?: boolean;
       findAllMatches?: boolean;
       shouldSort?: boolean;
-      keys: string[];
+      keys: FuseOptionKey<any>[];
     }`,
     true
   );
@@ -396,7 +405,7 @@ const generateServices = async (invokedFrom) => {
   if (shouldUpdate(servicesPath, `import Fuse from 'fuse.js';`)) {
     addImports(servicesPath, [`import Fuse from 'fuse.js';`]);
   }
-  if (shouldUpdate(servicesPath, `import { FuseResult } from 'fuse.js';`)) {
-    addImports(servicesPath, [`import { FuseResult } from 'fuse.js';`]);
+  if (shouldUpdate(servicesPath, `import { FuseOptionKey, FuseResult } from 'fuse.js';`)) {
+    addImports(servicesPath, [`import { FuseOptionKey, FuseResult } from 'fuse.js';`]);
   }
 }

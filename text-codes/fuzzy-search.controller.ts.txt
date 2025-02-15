@@ -170,12 +170,7 @@ export class FuzzySearchController {
     });
 
     options.keys = [...modelProperties];
-
-    searchTerm = searchTerm.replace(/%20/g, ' ');
-    if (searchTerm.split(' ').length > 1) {
-      searchTerm = searchTerm.split(' ').map(word => `=${word}`).join(' ');
-      searchTerm = searchTerm.replace(/ /g, ' | ');
-    }
+    searchTerm = decodeURIComponent(searchTerm);
     const flatSearchData = this.search(flatData, searchTerm, options, limit);
 
     // adding reference and removing duplicate matches
