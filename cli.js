@@ -256,12 +256,12 @@ module.exports = async () => {
 
           const options: FuzzySearchOptions = {
             includeScore: true,
+            includeMatches: true,
+            minMatchCharLength: 3,
+            ignoreLocation: true,
+            useExtendedSearch: true,
             shouldSort: true,
             findAllMatches: true,
-            minMatchCharLength: 2,
-            threshold: 0.6,
-            ignoreLocation: true,
-            includeMatches: true,
             keys: [],
           };
 
@@ -277,7 +277,10 @@ module.exports = async () => {
 
           let searchTerm = segments[segments.indexOf('fuzzy') + 1];
           searchTerm = decodeURIComponent(searchTerm);
-
+          if(searchTerm.split(' ').length > 1) {
+            searchTerm = searchTerm.split(' ').map(word => \`=\${word}\`).join(' ');
+            searchTerm = searchTerm.replace(/ /g, ' | ');
+          }
           if (searchTerm) {
             let searchResult = this.FuzzySearchService.search(
               result,
