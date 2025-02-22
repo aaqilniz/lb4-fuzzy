@@ -112,7 +112,6 @@ module.exports = async () => {
     const fileNames = fs.readdirSync(modelDirPath);
     const controllerIndexPath = `${invokedFrom}/src/controllers/index.ts`;
     const repoDirPath = `${invokedFrom}/src/repositories`;
-    const repoFileNames = fs.readdirSync(repoDirPath);
     const modelNames = new Set();
     fileNames.forEach(fileName => {
       if (fileName !== 'README.md' && fileName !== 'index.ts') {
@@ -266,28 +265,24 @@ module.exports = async () => {
           };
 
           if (threshold) { options.threshold = threshold; }
-          keys.forEach((key: any) => {
-            let weight = 0.1;
-            let customWeightKeys = Object.keys(customWeights);
-            if (customWeightKeys.includes(key as string)) {
-              weight = customWeights[key] as unknown as number;
-            }
-            options.keys.push({ name: key as string, weight });
-          });
-
+          let customWeightKeys = Object.keys(customWeights);
+          if (customWeightKeys.length) {
+            keys.forEach((key: any) => {
+              let weight = 0.1;
+              if (customWeightKeys.includes(key as string)) {
+                weight = customWeights[key] as unknown as number;
+              }
+              options.keys.push({ name: key as string, weight });
+            });
+          } else {
+            keys.forEach((key: any) => {
+              options.keys.push({ name: key as string });
+            });
+          }
           let searchTerm = segments[segments.indexOf('fuzzy') + 1];
           searchTerm = decodeURIComponent(searchTerm);
-          if(searchTerm.split(' ').length > 1) {
-            searchTerm = searchTerm.split(' ').map(word => \`=\${word}\`).join(' ');
-            searchTerm = searchTerm.replace(/ /g, ' | ');
-          }
           if (searchTerm) {
-            let searchResult = this.FuzzySearchService.search(
-              result,
-              searchTerm,
-              options,
-              limit
-            );
+            let searchResult = this.dynamicMultiSearch(searchTerm, result, options, limit);
             searchResult = searchResult.map((item: any) => {
               return {
                 ...item,
@@ -326,6 +321,31 @@ module.exports = async () => {
             }
             return Object.keys(modelDefinition.properties);
             }`,
+        true
+      );
+    }
+    // add dynamicMultiSearch method
+    if (!interceptorFileContent.includes('dynamicMultiSearch')) {
+      updateFile(
+        interceptorPath,
+        `async intercept(`,
+        `dynamicMultiSearch = (searchQuery: string, result: any, options: any, limit: any) => {
+          const terms = searchQuery.split(' ');
+          const resultsMap = new Map();
+          terms.forEach(term => {
+            const searchResults = this.FuzzySearchService.search(result, term, options, limit);
+            searchResults.forEach((res) => {
+              const item: any = res.item as any;
+              const { score, matches } = res;
+              if (resultsMap.has(item.id)) {
+              resultsMap.get(item.id).score *= score || 1;
+              } else {
+               resultsMap.set(item.id, { item, score, matches });
+              }
+            });
+          });
+          return Array.from(resultsMap.values()).sort((a, b) => a.score - b.score);
+        }`,
         true
       );
     }
