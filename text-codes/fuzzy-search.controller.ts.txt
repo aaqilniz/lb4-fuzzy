@@ -40,6 +40,28 @@ export class FuzzySearchController {
     }
     return Object.keys(modelDefinition.properties);
   }
+  dynamicMultiSearch = (
+    searchQuery: string,
+    result: any,
+    options: any,
+    limit: any
+  ) => {
+    const terms = searchQuery.split(' ');
+    const resultsMap = new Map();
+    terms.forEach((term) => {
+      const searchResults = this.fuzzySearchService.search(result, term, options, limit);
+      searchResults.forEach((res) => {
+        const item: any = res.item as any;
+        const { score, matches } = res;
+        if (resultsMap.has(item.id)) {
+          resultsMap.get(item.id).score *= score || 1;
+        } else {
+          resultsMap.set(item.id, { item, score, matches });
+        }
+      });
+    });
+    return Array.from(resultsMap.values()).sort((a, b) => a.score - b.score);
+  };
   private search(
     data: any,
     searchTerm: string,
@@ -171,11 +193,7 @@ export class FuzzySearchController {
 
     options.keys = [...modelProperties];
     searchTerm = decodeURIComponent(searchTerm);
-    if (searchTerm.split(' ').length > 1) {
-      searchTerm = searchTerm.split(' ').map(word => `=${word}`).join(' ');
-      searchTerm = searchTerm.replace(/ /g, ' | ');
-    }
-    const flatSearchData = this.search(flatData, searchTerm, options, limit);
+    const flatSearchData = this.dynamicMultiSearch(searchTerm, flatData, options, limit);
 
     // adding reference and removing duplicate matches
     flatSearchData.forEach((result, index) => {
